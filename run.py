@@ -28,6 +28,48 @@ def setup_output_directory() -> Path:
     return output_dir
 
 
+def find_invoice_file(file_path: str) -> str:
+    """
+    Find the invoice file, handling various path scenarios.
+
+    Args:
+        file_path: The file path from environment variable
+
+    Returns:
+        Valid file path
+
+    Raises:
+        FileNotFoundError: If file cannot be found
+    """
+    # Try the exact path first
+    if Path(file_path).exists():
+        return file_path
+
+    # Try just the filename in current directory
+    filename = Path(file_path).name
+    if Path(filename).exists():
+        return filename
+
+    # Try looking for any PDF in current directory (for test runs)
+    pdf_files = list(Path('.').glob('*.pdf'))
+    if pdf_files:
+        return str(pdf_files[0])
+
+    # Try common upload directories
+    common_paths = [
+        Path('./uploads') / filename,
+        Path('./') / filename,
+        Path('../') / filename,
+    ]
+
+    for path in common_paths:
+        if path.exists():
+            return str(path)
+
+    # If still not found, return original path (will fail with clear error)
+    return file_path
+
+
 def get_environment_inputs() -> dict:
     """
     Get and validate inputs from environment variables.
@@ -35,8 +77,14 @@ def get_environment_inputs() -> dict:
     Returns:
         Dictionary of validated inputs
     """
+    # Get the invoice file path - Abyss provides file paths
+    invoice_file = os.environ.get('invoice_file', 'invoice.pdf')
+
+    # Try to find the actual file
+    invoice_file = find_invoice_file(invoice_file)
+
     return {
-        'invoice_file': os.environ.get('invoice_file', 'invoice.pdf'),
+        'invoice_file': invoice_file,
         'output_format': os.environ.get('output_format', 'csv'),
         'ai_provider': os.environ.get('ai_provider', 'openai'),
         'use_ocr': os.environ.get('use_ocr', 'false').lower() == 'true',
@@ -166,6 +214,14 @@ def main():
         logger.info(f"AI provider: {ai_provider}")
         logger.info(f"OCR enabled: {use_ocr}")
 
+        # Debug: Check if file exists
+        if not Path(invoice_file).exists():
+            logger.warning(f"File not found at: {invoice_file}")
+            logger.info(f"Current working directory: {os.getcwd()}")
+            logger.info(f"Files in current directory: {list(Path('.').glob('*.*'))[:10]}")
+        else:
+            logger.info(f"File found successfully: {Path(invoice_file).absolute()}")
+
         # Extract PDF metadata
         try:
             metadata = get_pdf_metadata(invoice_file)
@@ -189,12 +245,26 @@ def main():
         # Step 2: Parse with AI
         logger.step(3, 4, f"Parsing invoice with {ai_provider.upper()}...")
 
+        # Check if API key is available, otherwise use test mode
         if test_mode:
             logger.info("Test mode enabled - using mock parser")
             from utils.ai_parser import parse_invoice_mock
             parsed_data = parse_invoice_mock(invoice_text)
         else:
-            parsed_data = parse_invoice_with_ai(invoice_text, ai_provider)
+            # Check if API key exists
+            api_key_available = False
+            if ai_provider == 'openai' and os.environ.get('OPENAI_API_KEY'):
+                api_key_available = True
+            elif ai_provider == 'anthropic' and os.environ.get('ANTHROPIC_API_KEY'):
+                api_key_available = True
+
+            if not api_key_available:
+                logger.warning(f"No {ai_provider.upper()} API key found - falling back to test mode")
+                logger.info("Using mock parser for basic extraction")
+                from utils.ai_parser import parse_invoice_mock
+                parsed_data = parse_invoice_mock(invoice_text)
+            else:
+                parsed_data = parse_invoice_with_ai(invoice_text, ai_provider)
 
         logger.info("Invoice parsed successfully")
         logger.info(f"Found {len(parsed_data.get('line_items', []))} line items")
