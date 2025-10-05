@@ -25,10 +25,11 @@ This widget extracts structured data from invoice PDFs using AI (OpenAI GPT-4 or
 **Key Capabilities:**
 - Extract vendor, customer, invoice details, line items, and financial data
 - Support for OpenAI GPT-4 and Anthropic Claude
+- **Works without API keys** - automatic fallback to basic extraction
 - OCR support for image-based PDFs
 - Multiple output formats (CSV, JSON, or both)
 - Comprehensive error handling and validation
-- Test mode with mock parser
+- Robust file discovery for Abyss platform deployment
 
 ---
 
@@ -36,12 +37,13 @@ This widget extracts structured data from invoice PDFs using AI (OpenAI GPT-4 or
 
 ### Core Features
 - ✅ **AI-Powered Parsing** - Uses GPT-4 or Claude for intelligent data extraction
+- ✅ **Works Without API Keys** - Automatic fallback to mock parser for basic extraction
 - ✅ **Multi-Format Output** - CSV, JSON, or both formats
 - ✅ **OCR Support** - Extract text from image-based PDFs
 - ✅ **Robust Validation** - Validates files, API keys, and extracted data
 - ✅ **Error Handling** - Comprehensive error messages and troubleshooting guides
 - ✅ **Logging System** - Step-by-step progress tracking
-- ✅ **Test Mode** - Mock parser for testing without API calls
+- ✅ **Smart File Discovery** - Handles various file path scenarios on Abyss platform
 
 ### Extracted Data Fields
 - Vendor information (name, address, email, phone)
@@ -61,9 +63,8 @@ invoice-parser-widget/
 ├── run.py                      # Main entry point
 ├── requirements.txt            # Python dependencies
 ├── requirements.system         # System dependencies (apt packages)
-├── pytest.ini                  # Test configuration
 ├── .gitignore                  # Git ignore rules
-├── .env                        # Environment variables (not in git)
+├── README.md                   # This documentation
 │
 ├── utils/                      # Core utility modules
 │   ├── __init__.py            # Module exports
@@ -156,20 +157,19 @@ sudo apt-get install poppler-utils tesseract-ocr
 brew install poppler tesseract
 ```
 
-### 4. Set Environment Variables
-Create a `.env` file:
+### 4. Set Environment Variables (Optional)
+The widget works without API keys (uses mock parser), but for best results:
 ```bash
-# Required: Choose one AI provider
-OPENAI_API_KEY=your_openai_key_here
+# Optional: AI provider (widget works without this)
+export OPENAI_API_KEY=your_openai_key_here
 # OR
-ANTHROPIC_API_KEY=your_anthropic_key_here
+export ANTHROPIC_API_KEY=your_anthropic_key_here
 
 # Optional: Configure behavior
-invoice_file=invoice.pdf
-output_format=csv
-ai_provider=openai
-use_ocr=false
-test_mode=false
+export invoice_file=invoice.pdf
+export output_format=csv
+export ai_provider=openai
+export use_ocr=false
 ```
 
 ---
@@ -218,11 +218,10 @@ After successful execution, the `output/` directory will contain:
 |----------|---------|---------|-------------|
 | `invoice_file` | `invoice.pdf` | Any PDF path | Path to invoice PDF |
 | `output_format` | `csv` | `csv`, `json`, `both` | Output format |
-| `ai_provider` | `openai` | `openai`, `anthropic` | AI provider |
+| `ai_provider` | `openai` | `openai`, `anthropic` | AI provider (optional) |
 | `use_ocr` | `false` | `true`, `false` | Enable OCR processing |
-| `test_mode` | `false` | `true`, `false` | Use mock parser |
-| `OPENAI_API_KEY` | - | API key | OpenAI API key |
-| `ANTHROPIC_API_KEY` | - | API key | Anthropic API key |
+| `OPENAI_API_KEY` | - | API key | OpenAI API key (optional - uses mock parser if not set) |
+| `ANTHROPIC_API_KEY` | - | API key | Anthropic API key (optional - uses mock parser if not set) |
 
 ### Supported File Formats
 - **Input:** PDF files (up to 5MB)
@@ -308,6 +307,8 @@ python -m pytest tests/test_integration.py -v
 ✅ **Error Handling** - Comprehensive validation and user-friendly errors
 ✅ **Test Coverage** - 46 tests with 74% coverage
 ✅ **Mock Parser** - Test without API calls
+✅ **Smart File Discovery** - Handles Abyss platform file path variations
+✅ **API Key Fallback** - Automatic graceful degradation without API keys
 ✅ **Enhanced Output** - Better formatting and summaries
 ✅ **Type Safety** - Type hints throughout codebase
 ✅ **Documentation** - Complete API reference and guides
@@ -414,12 +415,14 @@ Format parsed data to JSON file.
 export invoice_file=/full/path/to/invoice.pdf
 ```
 
-#### 2. API Key Missing
-**Error:** `ValueError: OPENAI_API_KEY environment variable not set`
+#### 2. Want to Use AI Instead of Mock Parser
+**Note:** The widget automatically uses a basic mock parser if no API key is provided
 
-**Solution:** Set the API key in your environment
+**Solution:** Set an API key for better AI-powered extraction
 ```bash
 export OPENAI_API_KEY=your_key_here
+# OR
+export ANTHROPIC_API_KEY=your_key_here
 ```
 
 #### 3. No Text Extracted
